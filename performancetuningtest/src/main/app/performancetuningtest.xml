@@ -1,7 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
-	xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.9.0"
+<mule xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:cluster="http://www.mulesoft.org/schema/mule/ee/cluster" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
-http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd"></mule>
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+    <file:connector name="File" autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    <queued-asynchronous-processing-strategy name="Queued_Asynchronous_Processing_Strategy" maxThreads="100" minThreads="50" threadTTL="5000" threadWaitTimeout="5000" maxBufferSize="200" queueTimeout="1000" maxQueueSize="150" doc:name="Queued Asynchronous Processing Strategy">
+        <file-queue-store/>
+    </queued-asynchronous-processing-strategy>
+    <configuration defaultProcessingStrategy="Queued_Asynchronous_Processing_Strategy" doc:name="Configuration">
+        <http:config useTransportForUris="false"/>
+    </configuration>
+    <flow name="performancetuningtestFlow">
+        <file:inbound-endpoint path="C:\input" connector-ref="File" pollingFrequency="5000" responseTimeout="10000" doc:name="File"/>
+        <logger message="*****************************NEW FILE PROCESSOR INVOKED*****************************" level="INFO" doc:name="Logger"/>
+        <custom-transformer class="performancetuningtest.SetRegistryVars" doc:name="Java Set Registry Vars"/>
+        <file:file-to-string-transformer doc:name="File to String"/>
+        <splitter expression="#[groovy:payload.readLines()]" doc:name="Splitter"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="bidsvmq" doc:name="VM"/>
+        <logger message="*******REGISTRY in main flow: #[app.registry.get(&quot;max_bid_amount&quot;)] #[app.registry.get(&quot;max_bid_bidder_id&quot;)]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="performancetuningtestFlow1" processingStrategy="Queued_Asynchronous_Processing_Strategy">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="bidsvmq" doc:name="VM"/>
+        <custom-transformer class="performancetuningtest.PerformanceTuningTransformer" doc:name="Java Process Payload"/>
+        <logger message="*******REGISTRY in sub flow: #[app.registry.get(&quot;max_bid_amount&quot;)] #[app.registry.get(&quot;max_bid_bidder_id&quot;)]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>
